@@ -47,6 +47,8 @@ bash
 Copy
 Edit
 exit
+
+
 6. **Output Files**
 query_results.csv: CSV file containing query results (if saved).
 
