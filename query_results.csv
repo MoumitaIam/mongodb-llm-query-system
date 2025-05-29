@@ -1,0 +1,6 @@
+Rating,Discount,_id,LaunchDate,Brand,Category,Stock,ReviewCount,Price,ProductID,ProductName
+4.8,15%,6838acc41b314b9d483acbea,05-09-2021,Sony,Electronics,60,125,199.99,103,Noise Cancelling Headphones
+4.3,20%,6838acc41b314b9d483acbeb,10-02-2022,Nike,Sports,200,500,49.99,104,Running Shoes
+4.1,8%,6838acc41b314b9d483acbee,15-08-2021,Keurig,Home & Kitchen,90,240,89.99,107,Coffee Maker
+4.4,5%,6838acc41b314b9d483acbef,05-01-2022,Manduka,Sports,300,320,29.99,108,Yoga Mat
+4.3,10%,6838acc41b314b9d483acbf1,20-10-2021,Dyson,Home & Kitchen,70,290,129.99,110,Vacuum Cleaner

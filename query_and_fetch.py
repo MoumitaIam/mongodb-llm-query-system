@@ -1,0 +1,99 @@
+from langchain.llms import LlamaCpp
+from pymongo import MongoClient
+import json
+import re
+import csv
+
+# Initialize LLM
+model_path = "mistral-7b.gguf"  # update path as needed
+llm = LlamaCpp(model_path=model_path, n_ctx=4096, temperature=0.1, max_tokens=512, chat=True)
+
+# Connect to MongoDB
+client = MongoClient("mongodb://localhost:27017/")
+db = client["testdb"]            # Your DB name
+collection = db["products"]      # Your collection name
+
+def clean_and_parse_json(raw_text):
+    """Extract JSON from raw LLM output and parse it"""
+    json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+    if json_match:
+        json_str = json_match.group(0)
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON decoding error: {e}")
+    else:
+        raise ValueError("No valid JSON found in the response.")
+
+def generate_mongo_query(user_input):
+    """Generate MongoDB filter dict from natural language query"""
+    messages = [
+        {"role": "system", "content": (
+            "You are an AI assistant that ONLY outputs a MongoDB query filter dictionary in JSON format. "
+            "Use exact field names: 'Rating', 'ReviewCount', and 'Brand'. "
+            "Do NOT include any explanations, markdown, code blocks, or extra text."
+        )},
+        {"role": "user", "content": user_input},
+    ]
+
+    response = llm.invoke(messages)
+    try:
+        mongo_query_filter = clean_and_parse_json(response)
+        return mongo_query_filter
+    except ValueError as e:
+        print(f"Failed to parse generated query as JSON.\nRaw output: {response}\nError: {e}")
+        return None
+
+def query_mongo(mongo_filter):
+    """Query MongoDB collection with given filter and return documents"""
+    results = list(collection.find(mongo_filter))
+    return results
+
+def save_results_to_csv(results, filename="query_results.csv"):
+    """Save MongoDB query results (list of dicts) to CSV"""
+    if not results:
+        print("No results to save.")
+        return
+    keys = set()
+    for doc in results:
+        keys.update(doc.keys())
+    keys = list(keys)
+    with open(filename, "w", newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        for doc in results:
+            # Convert ObjectId to string if present
+            if '_id' in doc:
+                doc['_id'] = str(doc['_id'])
+            writer.writerow(doc)
+    print(f"Results saved to {filename}")
+
+if __name__ == "__main__":
+    while True:
+        user_input = input("Enter your natural language query (or type 'exit' to quit): ")
+        if user_input.lower() == "exit":
+            print("Exiting program.")
+            break
+
+        print("Generating MongoDB query...")
+        mongo_query_filter = generate_mongo_query(user_input)
+        if mongo_query_filter is None:
+            print("Could not generate a valid MongoDB query filter. Please try again.\n")
+            continue
+
+        print("\nGenerated MongoDB query filter:")
+        print(json.dumps(mongo_query_filter, indent=2))
+
+        results = query_mongo(mongo_query_filter)
+        print(f"\nNumber of documents found: {len(results)}")
+        for i, doc in enumerate(results, 1):
+            # Convert ObjectId to string for clean display
+            if '_id' in doc:
+                doc['_id'] = str(doc['_id'])
+            print(f"\nDocument {i}:")
+            print(json.dumps(doc, indent=2))
+
+        save_option = input("\nWould you like to save the results to a CSV file? (yes/no): ")
+        if save_option.strip().lower() in ['yes', 'y']:
+            save_results_to_csv(results)
+        print("\n" + "-"*40 + "\n")
